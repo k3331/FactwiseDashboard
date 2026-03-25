@@ -463,6 +463,8 @@ export default function EmployeeGrid({
           onGridReady={onGridReady}
           domLayout="autoHeight"
           getRowId={(params) => String(params.data.id)}
+          rowBuffer={10}
+          suppressColumnVirtualisation={false}
         />
       </div>
     </div>

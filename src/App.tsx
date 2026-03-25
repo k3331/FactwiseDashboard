@@ -5,23 +5,17 @@ import EmployeeGrid from "./components/EmployeeGrid";
 import EmployeeFormModal from "./components/EmployeeFormModal";
 import type { EmployeeFormData } from "./components/EmployeeFormModal";
 import ConfirmModal from "./components/ConfirmModal";
-import initialEmployees from "./data/employees";
+import { useEmployees } from "./hooks/useEmployees";
 import type { Employee } from "./types/employee";
 
 export default function App() {
-  const [employees, setEmployees] = useState<Employee[]>(initialEmployees);
+  const { employees, addEmployee, updateEmployee, deleteEmployee } =
+    useEmployees();
 
-  // Modal state
   const [formOpen, setFormOpen] = useState(false);
   const [editingEmployee, setEditingEmployee] = useState<Employee | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<Employee | null>(null);
 
-  const nextId = () =>
-    employees.length > 0
-      ? Math.max(...employees.map((e) => e.id)) + 1
-      : 1;
-
-  // --- CRUD handlers ---
   const handleAdd = useCallback(() => {
     setEditingEmployee(null);
     setFormOpen(true);
@@ -39,19 +33,14 @@ export default function App() {
   const handleFormSave = useCallback(
     (data: EmployeeFormData) => {
       if (editingEmployee) {
-        setEmployees((prev) =>
-          prev.map((e) =>
-            e.id === editingEmployee.id ? { ...e, ...data } : e
-          )
-        );
+        updateEmployee(editingEmployee.id, data);
       } else {
-        const newEmployee: Employee = { id: nextId(), ...data };
-        setEmployees((prev) => [...prev, newEmployee]);
+        addEmployee(data);
       }
       setFormOpen(false);
       setEditingEmployee(null);
     },
-    [editingEmployee, employees]
+    [editingEmployee, addEmployee, updateEmployee]
   );
 
   const handleFormCancel = useCallback(() => {
@@ -61,10 +50,10 @@ export default function App() {
 
   const handleDeleteConfirm = useCallback(() => {
     if (deleteTarget) {
-      setEmployees((prev) => prev.filter((e) => e.id !== deleteTarget.id));
+      deleteEmployee(deleteTarget.id);
       setDeleteTarget(null);
     }
-  }, [deleteTarget]);
+  }, [deleteTarget, deleteEmployee]);
 
   const handleDeleteCancel = useCallback(() => {
     setDeleteTarget(null);
@@ -72,7 +61,6 @@ export default function App() {
 
   return (
     <div className="mx-auto max-w-[1440px] px-4 pb-12 sm:px-6">
-      {/* Header */}
       <header className="flex animate-fade-in flex-col gap-3 border-b border-slate-200 py-5 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex items-center gap-3.5">
           <svg width="32" height="32" viewBox="0 0 32 32" fill="none" className="shrink-0">
@@ -98,7 +86,6 @@ export default function App() {
         </span>
       </header>
 
-      {/* Content */}
       <main className="mt-2">
         <SummaryCards data={employees} />
         <div className="mb-6">
@@ -112,7 +99,6 @@ export default function App() {
         />
       </main>
 
-      {/* Add / Edit modal */}
       <EmployeeFormModal
         open={formOpen}
         employee={editingEmployee}
@@ -120,7 +106,6 @@ export default function App() {
         onCancel={handleFormCancel}
       />
 
-      {/* Delete confirmation */}
       <ConfirmModal
         open={deleteTarget !== null}
         title="Delete Employee"

@@ -65,6 +65,19 @@ Zero additional runtime dependencies -- pie chart is pure SVG, animations use CS
 
 ---
 
+## Scalability
+
+Although the sample dataset is 20 rows, the grid is configured for large-scale performance:
+
+- **`getRowId`** — rows are keyed by `id` (not array index), so AG Grid can diff and update individual rows in O(1) instead of re-rendering the full list on CRUD operations.
+- **Row virtualisation** — AG Grid Community renders only the visible viewport rows by default (`rowBuffer: 10`). This keeps DOM node count constant even at 100k+ rows.
+- **Column virtualisation** — off-screen columns are also virtualised (`suppressColumnVirtualisation: false`), reducing layout work for wide datasets.
+- **Stable row identity** — combined with `animateRows`, AG Grid can animate only the affected rows during add/update/delete instead of reflowing the entire grid.
+- **Client-side row model** — chosen deliberately for this dataset size; for datasets beyond ~50k rows, the same component interface works with AG Grid's Server-Side Row Model with minimal changes.
+- **Custom hook separation** — `useEmployees` encapsulates all CRUD state logic, making it trivial to swap the in-memory store for an API layer without touching UI components.
+
+---
+
 ## Project Structure
 
 ```
@@ -73,13 +86,15 @@ src/
 │   └── employee.ts              # Employee & Department types
 ├── data/
 │   └── employees.ts             # Sample dataset (20 records)
+├── hooks/
+│   └── useEmployees.ts          # CRUD state logic (add, update, delete)
 ├── components/
 │   ├── SummaryCards.tsx          # KPI metric cards + department chips
 │   ├── DepartmentPieChart.tsx    # SVG donut chart with legend
 │   ├── EmployeeGrid.tsx         # AG Grid with toolbar, custom renderers, 3-dot menu
 │   ├── EmployeeFormModal.tsx    # Add/Edit form with validation
 │   └── ConfirmModal.tsx         # Delete confirmation dialog
-├── App.tsx                      # Root layout + state management + CRUD handlers
+├── App.tsx                      # Root layout + modal orchestration
 ├── main.tsx                     # Entry point
 └── index.css                    # Tailwind import + animation keyframes
 ```
