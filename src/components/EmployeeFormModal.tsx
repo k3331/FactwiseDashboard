@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { useForm } from "react-hook-form";
 import type { Department, Employee } from "../types/employee";
 
 const DEPARTMENTS: Department[] = [
@@ -11,7 +12,7 @@ const DEPARTMENTS: Department[] = [
 
 type EmployeeFormData = Omit<Employee, "id">;
 
-const EMPTY_FORM: EmployeeFormData = {
+const DEFAULTS: EmployeeFormData = {
   firstName: "",
   lastName: "",
   email: "",
@@ -42,22 +43,30 @@ export default function EmployeeFormModal({
   onCancel,
 }: EmployeeFormModalProps) {
   const isEdit = employee !== null;
-  const [form, setForm] = useState<EmployeeFormData>(EMPTY_FORM);
+
+  const {
+    register,
+    handleSubmit,
+    reset,
+    setValue,
+    watch,
+    formState: { errors },
+  } = useForm<EmployeeFormData>({ defaultValues: DEFAULTS });
+
+  const skills = watch("skills");
   const [skillInput, setSkillInput] = useState("");
-  const [errors, setErrors] = useState<Partial<Record<keyof EmployeeFormData, string>>>({});
 
   useEffect(() => {
     if (open) {
       if (employee) {
         const { id: _id, ...rest } = employee;
-        setForm(rest);
+        reset(rest);
       } else {
-        setForm(EMPTY_FORM);
+        reset(DEFAULTS);
       }
       setSkillInput("");
-      setErrors({});
     }
-  }, [open, employee]);
+  }, [open, employee, reset]);
 
   useEffect(() => {
     if (!open) return;
@@ -68,38 +77,23 @@ export default function EmployeeFormModal({
     return () => window.removeEventListener("keydown", handleKey);
   }, [open, onCancel]);
 
-  function validate(): boolean {
-    const newErrors: typeof errors = {};
-    if (!form.firstName.trim()) newErrors.firstName = "Required";
-    if (!form.lastName.trim()) newErrors.lastName = "Required";
-    if (!form.email.trim()) newErrors.email = "Required";
-    else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email))
-      newErrors.email = "Invalid email";
-    if (!form.position.trim()) newErrors.position = "Required";
-    if (!form.location.trim()) newErrors.location = "Required";
-    if (form.salary <= 0) newErrors.salary = "Must be positive";
-    if (form.age < 18 || form.age > 100) newErrors.age = "18-100";
-    if (form.performanceRating < 0 || form.performanceRating > 5)
-      newErrors.performanceRating = "0-5";
-    setErrors(newErrors);
-    return Object.keys(newErrors).length === 0;
-  }
-
-  function handleSubmit(e: React.FormEvent) {
-    e.preventDefault();
-    if (validate()) onSave(form);
+  function onSubmit(data: EmployeeFormData) {
+    onSave({ ...data, manager: data.manager || null });
   }
 
   function handleAddSkill() {
     const trimmed = skillInput.trim();
-    if (trimmed && !form.skills.includes(trimmed)) {
-      setForm((f) => ({ ...f, skills: [...f.skills, trimmed] }));
+    if (trimmed && !skills.includes(trimmed)) {
+      setValue("skills", [...skills, trimmed]);
       setSkillInput("");
     }
   }
 
   function handleRemoveSkill(skill: string) {
-    setForm((f) => ({ ...f, skills: f.skills.filter((s) => s !== skill) }));
+    setValue(
+      "skills",
+      skills.filter((s) => s !== skill)
+    );
   }
 
   function handleSkillKeyDown(e: React.KeyboardEvent) {
@@ -119,7 +113,7 @@ export default function EmployeeFormModal({
   return (
     <div className="fixed inset-0 z-50 flex animate-overlay-in items-start justify-center overflow-y-auto bg-black/40 p-4 pt-[5vh]">
       <form
-        onSubmit={handleSubmit}
+        onSubmit={handleSubmit(onSubmit)}
         className="w-full max-w-2xl animate-slide-in-up rounded-xl bg-white shadow-xl"
         onClick={(e) => e.stopPropagation()}
       >
@@ -143,53 +137,46 @@ export default function EmployeeFormModal({
         {/* Body */}
         <div className="max-h-[70vh] overflow-y-auto px-6 py-5">
           <div className="grid grid-cols-1 gap-x-4 gap-y-4 sm:grid-cols-2">
-            {/* First Name */}
             <div>
               <label className={labelCls}>First Name *</label>
               <input
                 className={inputCls}
-                value={form.firstName}
-                onChange={(e) => setForm((f) => ({ ...f, firstName: e.target.value }))}
                 placeholder="John"
+                {...register("firstName", { required: "Required" })}
               />
-              {errors.firstName && <p className={errorCls}>{errors.firstName}</p>}
+              {errors.firstName && <p className={errorCls}>{errors.firstName.message}</p>}
             </div>
 
-            {/* Last Name */}
             <div>
               <label className={labelCls}>Last Name *</label>
               <input
                 className={inputCls}
-                value={form.lastName}
-                onChange={(e) => setForm((f) => ({ ...f, lastName: e.target.value }))}
                 placeholder="Smith"
+                {...register("lastName", { required: "Required" })}
               />
-              {errors.lastName && <p className={errorCls}>{errors.lastName}</p>}
+              {errors.lastName && <p className={errorCls}>{errors.lastName.message}</p>}
             </div>
 
-            {/* Email */}
             <div className="sm:col-span-2">
               <label className={labelCls}>Email *</label>
               <input
                 type="email"
                 className={inputCls}
-                value={form.email}
-                onChange={(e) => setForm((f) => ({ ...f, email: e.target.value }))}
                 placeholder="john.smith@company.com"
+                {...register("email", {
+                  required: "Required",
+                  pattern: {
+                    value: /^[^\s@]+@[^\s@]+\.[^\s@]+$/,
+                    message: "Invalid email",
+                  },
+                })}
               />
-              {errors.email && <p className={errorCls}>{errors.email}</p>}
+              {errors.email && <p className={errorCls}>{errors.email.message}</p>}
             </div>
 
-            {/* Department */}
             <div>
               <label className={labelCls}>Department *</label>
-              <select
-                className={inputCls}
-                value={form.department}
-                onChange={(e) =>
-                  setForm((f) => ({ ...f, department: e.target.value as Department }))
-                }
-              >
+              <select className={inputCls} {...register("department")}>
                 {DEPARTMENTS.map((d) => (
                   <option key={d} value={d}>
                     {d}
@@ -198,145 +185,116 @@ export default function EmployeeFormModal({
               </select>
             </div>
 
-            {/* Position */}
             <div>
               <label className={labelCls}>Position *</label>
               <input
                 className={inputCls}
-                value={form.position}
-                onChange={(e) => setForm((f) => ({ ...f, position: e.target.value }))}
                 placeholder="Senior Developer"
+                {...register("position", { required: "Required" })}
               />
-              {errors.position && <p className={errorCls}>{errors.position}</p>}
+              {errors.position && <p className={errorCls}>{errors.position.message}</p>}
             </div>
 
-            {/* Salary */}
             <div>
               <label className={labelCls}>Salary ($) *</label>
               <input
                 type="number"
                 className={inputCls}
-                value={form.salary || ""}
-                onChange={(e) =>
-                  setForm((f) => ({ ...f, salary: Number(e.target.value) }))
-                }
                 placeholder="95000"
-                min={0}
+                {...register("salary", {
+                  valueAsNumber: true,
+                  required: "Required",
+                  min: { value: 1, message: "Must be positive" },
+                })}
               />
-              {errors.salary && <p className={errorCls}>{errors.salary}</p>}
+              {errors.salary && <p className={errorCls}>{errors.salary.message}</p>}
             </div>
 
-            {/* Age */}
             <div>
               <label className={labelCls}>Age *</label>
               <input
                 type="number"
                 className={inputCls}
-                value={form.age || ""}
-                onChange={(e) =>
-                  setForm((f) => ({ ...f, age: Number(e.target.value) }))
-                }
-                min={18}
-                max={100}
+                {...register("age", {
+                  valueAsNumber: true,
+                  required: "Required",
+                  min: { value: 18, message: "Min 18" },
+                  max: { value: 100, message: "Max 100" },
+                })}
               />
-              {errors.age && <p className={errorCls}>{errors.age}</p>}
+              {errors.age && <p className={errorCls}>{errors.age.message}</p>}
             </div>
 
-            {/* Location */}
             <div>
               <label className={labelCls}>Location *</label>
               <input
                 className={inputCls}
-                value={form.location}
-                onChange={(e) => setForm((f) => ({ ...f, location: e.target.value }))}
                 placeholder="New York"
+                {...register("location", { required: "Required" })}
               />
-              {errors.location && <p className={errorCls}>{errors.location}</p>}
+              {errors.location && <p className={errorCls}>{errors.location.message}</p>}
             </div>
 
-            {/* Hire Date */}
             <div>
               <label className={labelCls}>Hire Date</label>
               <input
                 type="date"
                 className={inputCls}
-                value={form.hireDate}
-                onChange={(e) => setForm((f) => ({ ...f, hireDate: e.target.value }))}
+                {...register("hireDate")}
               />
             </div>
 
-            {/* Performance Rating */}
             <div>
               <label className={labelCls}>Performance Rating (0-5)</label>
               <input
                 type="number"
                 step="0.1"
                 className={inputCls}
-                value={form.performanceRating}
-                onChange={(e) =>
-                  setForm((f) => ({
-                    ...f,
-                    performanceRating: Number(e.target.value),
-                  }))
-                }
-                min={0}
-                max={5}
+                {...register("performanceRating", {
+                  valueAsNumber: true,
+                  min: { value: 0, message: "Min 0" },
+                  max: { value: 5, message: "Max 5" },
+                })}
               />
               {errors.performanceRating && (
-                <p className={errorCls}>{errors.performanceRating}</p>
+                <p className={errorCls}>{errors.performanceRating.message}</p>
               )}
             </div>
 
-            {/* Projects Completed */}
             <div>
               <label className={labelCls}>Projects Completed</label>
               <input
                 type="number"
                 className={inputCls}
-                value={form.projectsCompleted}
-                onChange={(e) =>
-                  setForm((f) => ({
-                    ...f,
-                    projectsCompleted: Number(e.target.value),
-                  }))
-                }
-                min={0}
+                {...register("projectsCompleted", {
+                  valueAsNumber: true,
+                  min: { value: 0, message: "Min 0" },
+                })}
               />
             </div>
 
-            {/* Manager */}
             <div>
               <label className={labelCls}>Manager</label>
               <input
                 className={inputCls}
-                value={form.manager ?? ""}
-                onChange={(e) =>
-                  setForm((f) => ({
-                    ...f,
-                    manager: e.target.value || null,
-                  }))
-                }
                 placeholder="None"
+                {...register("manager")}
               />
             </div>
 
-            {/* Active */}
             <div className="flex items-center gap-2 self-end pb-1">
               <input
                 id="isActive"
                 type="checkbox"
                 className="h-4 w-4 rounded border-slate-300 text-indigo-500 accent-indigo-500"
-                checked={form.isActive}
-                onChange={(e) =>
-                  setForm((f) => ({ ...f, isActive: e.target.checked }))
-                }
+                {...register("isActive")}
               />
               <label htmlFor="isActive" className="text-sm font-medium text-slate-700">
                 Active
               </label>
             </div>
 
-            {/* Skills */}
+            {/* Skills -- managed outside RHF since it's a dynamic array with custom UI */}
             <div className="sm:col-span-2">
               <label className={labelCls}>Skills</label>
               <div className="flex gap-2">
@@ -355,9 +313,9 @@ export default function EmployeeFormModal({
                   Add
                 </button>
               </div>
-              {form.skills.length > 0 && (
+              {skills.length > 0 && (
                 <div className="mt-2 flex flex-wrap gap-1.5">
-                  {form.skills.map((skill) => (
+                  {skills.map((skill) => (
                     <span
                       key={skill}
                       className="inline-flex items-center gap-1 rounded-md bg-slate-100 px-2.5 py-1 text-xs font-medium text-slate-700"
